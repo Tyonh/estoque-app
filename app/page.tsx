@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-// Importando os ícones que combinam com o padrão da empresa
+import { useEffect, useState } from "react";
+import { supabaseClient as supabase } from "@/lib/supabase-client";
 import {
-  LayoutList,
-  ArrowRightLeft,
-  PackagePlus,
+  Package,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  LayoutDashboard,
   History,
-  ArrowLeft,
-  Building2,
+  PlusCircle,
+  Loader2,
+  TrendingDown,
 } from "lucide-react";
+import Link from "next/link";
 
 interface Produto {
   codigo: string;
@@ -18,220 +22,248 @@ interface Produto {
   estoque_minimo: number;
 }
 
-export default function Home() {
-  // Controle de qual tela estamos vendo: 'hub', 'visao_geral', 'movimentar'
-  const [telaAtual, setTelaAtual] = useState("hub");
-
-  // Estados da tabela
-  const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [carregando, setCarregando] = useState(true);
-
-  // A função que já criamos e funciona!
-  const buscarProdutos = async () => {
-    setCarregando(true);
-    try {
-      const resposta = await fetch("/api/produtos");
-      const dados = await resposta.json();
-      if (Array.isArray(dados)) {
-        setProdutos(dados);
-      } else {
-        setProdutos([]);
-      }
-    } catch (erro) {
-      console.error("Erro:", erro);
-      setProdutos([]);
-    } finally {
-      setCarregando(false);
-    }
-  };
+export default function DashboardEstoque() {
+  const [produtosCriticos, setProdutosCriticos] = useState<Produto[]>([]);
+  const [stats, setStats] = useState({ total: 0, alerta: 0, ok: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (telaAtual === "visao_geral") {
-      buscarProdutos();
+    async function fetchDashboardData() {
+      setIsLoading(true);
+
+      // Busca todos os produtos para calcular as estatísticas
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("codigo, nome, estoque_atual, estoque_minimo");
+
+      if (data) {
+        const total = data.length;
+        const emAlerta = data.filter(
+          (p) => (p.estoque_atual || 0) <= (p.estoque_minimo || 0),
+        );
+
+        setStats({
+          total,
+          alerta: emAlerta.length,
+          ok: total - emAlerta.length,
+        });
+
+        // Ordena os mais críticos (mais abaixo do mínimo) para mostrar primeiro
+        const criticos = emAlerta.sort(
+          (a, b) => (a.estoque_atual || 0) - (b.estoque_atual || 0),
+        );
+        setProdutosCriticos(criticos.slice(0, 5)); // Mostra apenas os 5 mais urgentes
+      }
+
+      setIsLoading(false);
     }
-  }, [telaAtual]);
 
-  // ==========================================
-  // COMPONENTE 1: O HUB CENTRAL (Igual à imagem)
-  // ==========================================
-  const renderHub = () => (
-    <div className="max-w-6xl mx-auto pt-12 pb-24 px-4 sm:px-6 lg:px-8">
-      {/* Cabeçalho do Hub */}
-      <div className="text-center mb-16">
-        <div className="flex justify-center items-center gap-4 mb-4">
-          {/* Substitua pelo logo do Grupo 3G se tiver a imagem na pasta public */}
-          <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center">
-            <Building2 className="text-white" size={24} />
+    fetchDashboardData();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* HEADER DE NAVEGAÇÃO RÁPIDA */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-indigo-600 p-2 rounded-lg">
+              <Package className="text-white" size={20} />
+            </div>
+            <span className="font-bold text-gray-800 text-lg">Estoque 3G</span>
           </div>
-          <h1 className="text-4xl font-extrabold text-[#1e293b]">
-            Sistema de Estoque
-          </h1>
-        </div>
-        <p className="text-lg text-slate-500">
-          Selecione o módulo desejado para gerir os produtos e movimentações da
-          empresa.
-        </p>
-      </div>
 
-      {/* Grid de Cartões */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {/* Cartão 1: Visão Geral */}
-        <div
-          onClick={() => setTelaAtual("visao_geral")}
-          className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 border border-slate-100 p-8 flex flex-col items-center text-center cursor-pointer group">
-          <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <LayoutList className="text-green-600" size={32} />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-3">Visão Geral</h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Consulte o saldo atualizado, alertas de estoque mínimo e a lista
-            completa de produtos.
-          </p>
-        </div>
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/" className="text-indigo-600 font-bold text-sm">
+              Dashboard
+            </Link>
+            <Link
+              href="/produtos"
+              className="text-gray-500 hover:text-indigo-600 font-medium text-sm transition-colors">
+              Produtos
+            </Link>
+            <Link
+              href="/movimentacoes"
+              className="text-gray-500 hover:text-indigo-600 font-medium text-sm transition-colors">
+              Histórico
+            </Link>
+          </nav>
 
-        {/* Cartão 2: Movimentações */}
-        <div
-          onClick={() => setTelaAtual("movimentar")}
-          className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 border border-slate-100 p-8 flex flex-col items-center text-center cursor-pointer group">
-          <div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <ArrowRightLeft className="text-orange-600" size={32} />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-3">
-            Movimentações
-          </h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Registre entradas de mercadorias ou dê baixa em produtos
-            especificando o motivo.
-          </p>
+          <Link
+            href="/movimentacoes/novo"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm">
+            <PlusCircle size={18} />
+            Novo Ajuste
+          </Link>
         </div>
-
-        {/* Cartão 3: Histórico */}
-        <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 border border-slate-100 p-8 flex flex-col items-center text-center cursor-pointer group opacity-70 hover:opacity-100">
-          <div className="w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-            <History className="text-purple-600" size={32} />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-3">
-            Histórico (Logs)
-          </h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Auditoria completa. Rastreie todas as entradas e saídas registradas
-            no sistema.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ==========================================
-  // COMPONENTE 2: A TABELA (Sua Visão Geral)
-  // ==========================================
-  const renderVisaoGeral = () => (
-    <div className="max-w-6xl mx-auto pt-8 pb-24 px-4 sm:px-6 lg:px-8">
-      <button
-        onClick={() => setTelaAtual("hub")}
-        className="flex items-center text-slate-500 hover:text-slate-800 mb-6 transition-colors">
-        <ArrowLeft size={20} className="mr-2" /> Voltar ao Hub
-      </button>
-
-      <header className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">
-            Visão Geral do Estoque
-          </h1>
-          <p className="text-slate-500">Acompanhamento de saldos e limites</p>
-        </div>
-        <button
-          onClick={() => setTelaAtual("movimentar")}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow font-medium transition-colors">
-          Nova Movimentação
-        </button>
       </header>
 
-      {/* A sua Tabela Original com um tapinha no design */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        {carregando ? (
-          <div className="p-12 text-center text-slate-500 flex flex-col items-center">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            Carregando produtos...
+      <main className="max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
+        {/* TITULO E STATUS DO SISTEMA */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-800">
+              Visão Geral
+            </h1>
+            <p className="text-gray-500 text-sm">
+              Monitorização em tempo real do inventário Grupo 3G.
+            </p>
           </div>
-        ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm">
-                <th className="p-4 font-semibold uppercase tracking-wider">
-                  Código (SKU)
-                </th>
-                <th className="p-4 font-semibold uppercase tracking-wider">
-                  Produto
-                </th>
-                <th className="p-4 font-semibold text-center uppercase tracking-wider">
-                  Estoque Atual
-                </th>
-                <th className="p-4 font-semibold text-center uppercase tracking-wider">
-                  Estoque Mín.
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {produtos.map((produto) => (
-                <tr
-                  key={produto.codigo}
-                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="p-4 text-slate-500 font-mono text-sm">
-                    {produto.codigo}
-                  </td>
-                  <td className="p-4 text-slate-800 font-medium">
-                    {produto.nome}
-                  </td>
-                  <td className="p-4 text-center">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-bold ${
-                        produto.estoque_atual < produto.estoque_minimo
-                          ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700"
-                      }`}>
-                      {produto.estoque_atual}
-                    </span>
-                  </td>
-                  <td className="p-4 text-center text-slate-400 font-medium">
-                    {produto.estoque_minimo}
-                  </td>
-                </tr>
-              ))}
-              {produtos.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-12 text-center text-slate-500">
-                    Nenhum produto cadastrado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-
-  // ==========================================
-  // RENDERIZAÇÃO PRINCIPAL
-  // ==========================================
-  return (
-    // Fundo clarinho cinza padrão de dashboards corporativos
-    <main className="min-h-screen bg-[#f8fafc]">
-      {telaAtual === "hub" && renderHub()}
-      {telaAtual === "visao_geral" && renderVisaoGeral()}
-      {telaAtual === "movimentar" && (
-        <div className="p-12 text-center">
-          <button
-            onClick={() => setTelaAtual("hub")}
-            className="mb-4 text-blue-600 font-bold underline">
-            Voltar
-          </button>
-          <h1 className="text-2xl font-bold text-slate-800">
-            Tela de Movimentação em Construção 🚧
-          </h1>
         </div>
-      )}
-    </main>
+
+        {/* CARDS DE RESUMO */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                <Package size={24} />
+              </div>
+              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                Total
+              </span>
+            </div>
+            <p className="text-gray-500 text-sm font-medium">
+              Itens no Catálogo
+            </p>
+            <h3 className="text-3xl font-black text-gray-800">
+              {isLoading ? "..." : stats.total}
+            </h3>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-red-50 text-red-600 rounded-xl">
+                <TrendingDown size={24} />
+              </div>
+              <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md">
+                Urgente
+              </span>
+            </div>
+            <p className="text-gray-500 text-sm font-medium">
+              Abaixo do Mínimo
+            </p>
+            <h3 className="text-3xl font-black text-gray-800">
+              {isLoading ? "..." : stats.alerta}
+            </h3>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sm:col-span-2 lg:col-span-1">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                <LayoutDashboard size={24} />
+              </div>
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                Status
+              </span>
+            </div>
+            <p className="text-gray-500 text-sm font-medium">Itens em Dia</p>
+            <h3 className="text-3xl font-black text-gray-800">
+              {isLoading ? "..." : stats.ok}
+            </h3>
+          </div>
+        </div>
+
+        {/* ÁREA DE ALERTAS E ÚLTIMAS AÇÕES */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* LISTA DE REPOSIÇÃO (ALERTA VERMELHO) */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="text-amber-500" size={20} />
+                <h2 className="font-bold text-gray-800">
+                  Necessitam de Reposição
+                </h2>
+              </div>
+              <Link
+                href="/produtos"
+                className="text-xs font-bold text-indigo-600 hover:underline">
+                Ver Todos
+              </Link>
+            </div>
+
+            {isLoading ? (
+              <div className="p-12 flex justify-center">
+                <Loader2 className="animate-spin text-gray-300" size={32} />
+              </div>
+            ) : produtosCriticos.length > 0 ? (
+              <div className="divide-y divide-gray-50">
+                {produtosCriticos.map((p) => (
+                  <div
+                    key={p.codigo}
+                    className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-gray-700">
+                        {p.nome}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        SKU: {p.codigo}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-xs text-gray-400 uppercase font-bold">
+                          Atual
+                        </p>
+                        <p className="text-lg font-black text-red-600">
+                          {p.estoque_atual}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-400 uppercase font-bold">
+                          Mínimo
+                        </p>
+                        <p className="text-sm font-bold text-gray-600">
+                          {p.estoque_minimo}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-12 text-center text-gray-400">
+                <p>Nenhum produto em estado crítico no momento. 🙌</p>
+              </div>
+            )}
+          </div>
+
+          {/* ACÇÕES RÁPIDAS */}
+          <div className="space-y-6">
+            <div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg shadow-indigo-100">
+              <h3 className="font-bold mb-2">Relatórios Rápidos</h3>
+              <p className="text-indigo-100 text-xs mb-4">
+                Veja quem retirou produtos validados pelo GEDOC recentemente.
+              </p>
+              <Link
+                href="/movimentacoes"
+                className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-bold transition-all w-full justify-center">
+                <History size={16} />
+                Ver Histórico de Saídas
+              </Link>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+              <h3 className="font-bold text-gray-800 mb-4 text-sm">
+                Integração GEDOC
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <ArrowDownRight className="text-red-500" size={18} />
+                  <span className="text-xs text-gray-600 leading-tight">
+                    Saídas automáticas via validação de documentos comerciais.
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <ArrowUpRight className="text-emerald-500" size={18} />
+                  <span className="text-xs text-gray-600 leading-tight">
+                    Entradas manuais justificadas por fornecedores ou devolução.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
