@@ -1,65 +1,237 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+// Importando os ícones que combinam com o padrão da empresa
+import {
+  LayoutList,
+  ArrowRightLeft,
+  PackagePlus,
+  History,
+  ArrowLeft,
+  Building2,
+} from "lucide-react";
+
+interface Produto {
+  codigo: string;
+  nome: string;
+  estoque_atual: number;
+  estoque_minimo: number;
+}
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+  // Controle de qual tela estamos vendo: 'hub', 'visao_geral', 'movimentar'
+  const [telaAtual, setTelaAtual] = useState("hub");
+
+  // Estados da tabela
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [carregando, setCarregando] = useState(true);
+
+  // A função que já criamos e funciona!
+  const buscarProdutos = async () => {
+    setCarregando(true);
+    try {
+      const resposta = await fetch("/api/produtos");
+      const dados = await resposta.json();
+      if (Array.isArray(dados)) {
+        setProdutos(dados);
+      } else {
+        setProdutos([]);
+      }
+    } catch (erro) {
+      console.error("Erro:", erro);
+      setProdutos([]);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  useEffect(() => {
+    if (telaAtual === "visao_geral") {
+      buscarProdutos();
+    }
+  }, [telaAtual]);
+
+  // ==========================================
+  // COMPONENTE 1: O HUB CENTRAL (Igual à imagem)
+  // ==========================================
+  const renderHub = () => (
+    <div className="max-w-6xl mx-auto pt-12 pb-24 px-4 sm:px-6 lg:px-8">
+      {/* Cabeçalho do Hub */}
+      <div className="text-center mb-16">
+        <div className="flex justify-center items-center gap-4 mb-4">
+          {/* Substitua pelo logo do Grupo 3G se tiver a imagem na pasta public */}
+          <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center">
+            <Building2 className="text-white" size={24} />
+          </div>
+          <h1 className="text-4xl font-extrabold text-[#1e293b]">
+            Sistema de Estoque
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+        </div>
+        <p className="text-lg text-slate-500">
+          Selecione o módulo desejado para gerir os produtos e movimentações da
+          empresa.
+        </p>
+      </div>
+
+      {/* Grid de Cartões */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Cartão 1: Visão Geral */}
+        <div
+          onClick={() => setTelaAtual("visao_geral")}
+          className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 border border-slate-100 p-8 flex flex-col items-center text-center cursor-pointer group">
+          <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+            <LayoutList className="text-green-600" size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-3">Visão Geral</h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            Consulte o saldo atualizado, alertas de estoque mínimo e a lista
+            completa de produtos.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Cartão 2: Movimentações */}
+        <div
+          onClick={() => setTelaAtual("movimentar")}
+          className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 border border-slate-100 p-8 flex flex-col items-center text-center cursor-pointer group">
+          <div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+            <ArrowRightLeft className="text-orange-600" size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-3">
+            Movimentações
+          </h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            Registre entradas de mercadorias ou dê baixa em produtos
+            especificando o motivo.
+          </p>
         </div>
-      </main>
+
+        {/* Cartão 3: Histórico */}
+        <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 border border-slate-100 p-8 flex flex-col items-center text-center cursor-pointer group opacity-70 hover:opacity-100">
+          <div className="w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+            <History className="text-purple-600" size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-3">
+            Histórico (Logs)
+          </h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            Auditoria completa. Rastreie todas as entradas e saídas registradas
+            no sistema.
+          </p>
+        </div>
+      </div>
     </div>
+  );
+
+  // ==========================================
+  // COMPONENTE 2: A TABELA (Sua Visão Geral)
+  // ==========================================
+  const renderVisaoGeral = () => (
+    <div className="max-w-6xl mx-auto pt-8 pb-24 px-4 sm:px-6 lg:px-8">
+      <button
+        onClick={() => setTelaAtual("hub")}
+        className="flex items-center text-slate-500 hover:text-slate-800 mb-6 transition-colors">
+        <ArrowLeft size={20} className="mr-2" /> Voltar ao Hub
+      </button>
+
+      <header className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">
+            Visão Geral do Estoque
+          </h1>
+          <p className="text-slate-500">Acompanhamento de saldos e limites</p>
+        </div>
+        <button
+          onClick={() => setTelaAtual("movimentar")}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow font-medium transition-colors">
+          Nova Movimentação
+        </button>
+      </header>
+
+      {/* A sua Tabela Original com um tapinha no design */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        {carregando ? (
+          <div className="p-12 text-center text-slate-500 flex flex-col items-center">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            Carregando produtos...
+          </div>
+        ) : (
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm">
+                <th className="p-4 font-semibold uppercase tracking-wider">
+                  Código (SKU)
+                </th>
+                <th className="p-4 font-semibold uppercase tracking-wider">
+                  Produto
+                </th>
+                <th className="p-4 font-semibold text-center uppercase tracking-wider">
+                  Estoque Atual
+                </th>
+                <th className="p-4 font-semibold text-center uppercase tracking-wider">
+                  Estoque Mín.
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {produtos.map((produto) => (
+                <tr
+                  key={produto.codigo}
+                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="p-4 text-slate-500 font-mono text-sm">
+                    {produto.codigo}
+                  </td>
+                  <td className="p-4 text-slate-800 font-medium">
+                    {produto.nome}
+                  </td>
+                  <td className="p-4 text-center">
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        produto.estoque_atual < produto.estoque_minimo
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
+                      }`}>
+                      {produto.estoque_atual}
+                    </span>
+                  </td>
+                  <td className="p-4 text-center text-slate-400 font-medium">
+                    {produto.estoque_minimo}
+                  </td>
+                </tr>
+              ))}
+              {produtos.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-12 text-center text-slate-500">
+                    Nenhum produto cadastrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+
+  // ==========================================
+  // RENDERIZAÇÃO PRINCIPAL
+  // ==========================================
+  return (
+    // Fundo clarinho cinza padrão de dashboards corporativos
+    <main className="min-h-screen bg-[#f8fafc]">
+      {telaAtual === "hub" && renderHub()}
+      {telaAtual === "visao_geral" && renderVisaoGeral()}
+      {telaAtual === "movimentar" && (
+        <div className="p-12 text-center">
+          <button
+            onClick={() => setTelaAtual("hub")}
+            className="mb-4 text-blue-600 font-bold underline">
+            Voltar
+          </button>
+          <h1 className="text-2xl font-bold text-slate-800">
+            Tela de Movimentação em Construção 🚧
+          </h1>
+        </div>
+      )}
+    </main>
   );
 }
