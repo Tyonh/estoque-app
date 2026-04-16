@@ -18,23 +18,21 @@ export default function LoginEstoque() {
     setError(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-      if (signInError) {
-        if (signInError.message === "Invalid login credentials") {
-          throw new Error("E-mail ou senha incorretos.");
-        }
-        throw signInError;
+      if (signInError) throw signInError;
+
+      if (data.session) {
+        // Força um recarregamento completo para o Middleware ler o cookie novo
+        window.location.href = "/";
       }
-
-      // Sucesso! Atualiza a página e vai para o Dashboard
-      router.refresh();
-      router.push("/");
     } catch (err: any) {
-      setError(err.message || "Ocorreu um erro ao fazer login.");
+      console.error("Erro no login:", err);
+      setError(err.message || "E-mail ou senha incorretos.");
     } finally {
       setIsLoading(false);
     }

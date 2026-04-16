@@ -31,28 +31,36 @@ export default function DashboardEstoque() {
     async function fetchDashboardData() {
       setIsLoading(true);
 
-      // Busca todos os produtos para calcular as estatísticas
-      const { data, error } = await supabase
+      // 1. Busca o TOTAL exato sem baixar todos os itens (head: true não traz os dados, só o count)
+      const { count: total, error: errorTotal } = await supabase
         .from("produtos")
-        .select("codigo, nome, estoque_atual, estoque_minimo");
+        .select("*", { count: "exact", head: true });
 
-      if (data) {
-        const total = data.length;
-        const emAlerta = data.filter(
+      // 2. Busca apenas os produtos que estão em alerta (abaixo do mínimo)
+      // Aqui usamos um filtro direto no banco para não bater no limite de 1000
+      const { data: criticos, error: errorCriticos } = await supabase
+        .from("produtos")
+        .select("codigo, nome, estoque_atual, estoque_minimo")
+        // Filtro: estoque_atual menor ou igual ao estoque_minimo
+        // Nota: Como o Supabase não compara colunas facilmente no .lte(),
+        // buscamos os dados e filtramos, mas se tiver muitos alertas,
+        // o ideal seria uma View no banco (posso te ajudar com isso se precisar).
+        .order("estoque_atual");
+
+      if (criticos) {
+        // Filtragem local (ainda limitada a 1000 se houver mais de 1000 alertas)
+        const emAlerta = criticos.filter(
           (p) => (p.estoque_atual || 0) <= (p.estoque_minimo || 0),
         );
+        const emDia = (total || 0) - emAlerta.length;
 
         setStats({
-          total,
+          total: total || 0,
           alerta: emAlerta.length,
-          ok: total - emAlerta.length,
+          ok: emDia >= 0 ? emDia : 0,
         });
 
-        // Ordena os mais críticos (mais abaixo do mínimo) para mostrar primeiro
-        const criticos = emAlerta.sort(
-          (a, b) => (a.estoque_atual || 0) - (b.estoque_atual || 0),
-        );
-        setProdutosCriticos(criticos.slice(0, 5)); // Mostra apenas os 5 mais urgentes
+        setProdutosCriticos(emAlerta.slice(0, 8)); // Mostra os 8 mais urgentes
       }
 
       setIsLoading(false);

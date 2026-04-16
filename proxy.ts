@@ -2,21 +2,21 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // 1. Criar a resposta base
   let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request: { headers: request.headers },
   });
 
+  // 2. Inicializar Supabase
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
@@ -26,33 +26,35 @@ export async function proxy(request: NextRequest) {
           );
         },
       },
-      cookieOptions: {
-        name: "sb-grupo3g-auth",
-        domain:
-          process.env.NODE_ENV === "production" ? ".grupo3g.com.br" : undefined,
-        path: "/",
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      },
     },
   );
 
+  // 3. Obter sessão
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session && !request.nextUrl.pathname.startsWith("/login")) {
+  // REGRA: Se não está logado e não está no login, vai para /login
+  if (!session && pathname !== "/login") {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (session) {
+  // REGRA: Se está logado e tenta ir para /login, vai para a Home
+  if (session && pathname === "/login") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // 4. Verificação de Cargo (Proteção extra para a Home e outras rotas)
+  if (session && pathname !== "/login" && pathname !== "/pendente") {
     const { data: perfil } = await supabase
       .from("perfis")
       .select("cargo")
       .eq("id", session.user.id)
       .single();
 
+    // Se o cargo não for permitido, manda para uma página de aviso
     if (!perfil || (perfil.cargo !== "admin" && perfil.cargo !== "vendedor")) {
+      // Importante: Verifique se app/pendente/page.tsx existe!
       return NextResponse.redirect(new URL("/pendente", request.url));
     }
   }
