@@ -1,9 +1,10 @@
 // app/api/produtos/route.js
 import { NextResponse } from "next/server";
-import { supabase } from "../../../lib/supabase";
+import { createSupabaseServer } from "../../../lib/supabase";
 
 export async function GET() {
   try {
+    const supabase = await createSupabaseServer();
     // Busca todos os produtos e ordena pelo nome
     const { data: produtos, error } = await supabase
       .from("produtos")

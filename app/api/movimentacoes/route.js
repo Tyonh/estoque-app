@@ -1,9 +1,10 @@
 // app/api/movimentacoes/route.js
 import { NextResponse } from "next/server";
-import { supabase } from "../../../lib/supabase";
+import { createSupabaseServer } from "../../../lib/supabase";
 
 export async function POST(request) {
   try {
+    const supabase = await createSupabaseServer();
     // 1. Recebe os dados do corpo da requisição (frontend)
     const { codigo_produto, tipo, quantidade, motivo } = await request.json();
 
